@@ -159,9 +159,7 @@ module Phonelib
     # * +phone+ - phone number for parsing
     # * +data+  - country data
     def phone_match_data?(phone, data, possible = false)
-      country_code = "#{data[Core::COUNTRY_CODE]}"
-      inter_prefix = "(#{data[Core::INTERNATIONAL_PREFIX]})?"
-      return unless phone.match cr("^#{inter_prefix}#{country_code}")
+      return unless phone.match phone_match_regexp(data)
 
       type = possible ? Core::POSSIBLE_PATTERN : Core::VALID_PATTERN
       phone.match full_regex_for_data(data, type, false)
@@ -264,18 +262,38 @@ module Phonelib
     # * +possible_pattern+ - possible pattern for validation
     # * +national_pattern+ - valid pattern for validation
     def number_valid_and_possible?(number, possible_pattern, national_pattern)
-      possible_match = number.match(cr("^(?:#{possible_pattern})$"))
+      possible_match = number.match(complete_pattern_regexp(possible_pattern))
       possible = possible_match && possible_match.to_s.length == number.length
 
       return [possible, possible] if possible_pattern == national_pattern
       valid = false
       if possible
         # doing national pattern match only in case possible matches
-        national_match = number.match(cr("^(?:#{national_pattern})$"))
+        national_match = number.match(complete_pattern_regexp(national_pattern))
         valid = national_match && national_match.to_s.length == number.length
       end
 
       [valid && possible, possible]
+    end
+
+    private
+
+    # Prevent major String allocations by caching this Regexp used in the
+    # `phone_match_data?` hotspot.
+    PHONE_MATCH_REGEXPS = Hash.new do |h, international_prefix|
+      h[international_prefix] = Hash.new do |h2, country_code|
+        h2[country_code] = Regexp.new("^(#{international_prefix})?#{country_code}")
+      end
+    end
+
+    PATTERN_REGEXPS = Hash.new { |h,k| h[k] = Regexp.new("^(?:#{k})$") }
+
+    def phone_match_regexp(data)
+      PHONE_MATCH_REGEXPS[data[Core::INTERNATIONAL_PREFIX]][data[Core::COUNTRY_CODE]]
+    end
+
+    def complete_pattern_regexp(pattern)
+      PATTERN_REGEXPS[pattern]
     end
   end
 end

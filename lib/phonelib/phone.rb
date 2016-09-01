@@ -29,7 +29,7 @@ module Phonelib
 
     # method to get sanitized phone number (only numbers)
     def sanitized
-      @original && @original.gsub(/[^0-9]+/, '') || ''
+      @original && @original.gsub(/[^0-9]+/, ''.freeze) || ''
     end
 
     # Returns all phone types that matched valid patterns
